@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111827">
+  <title>Evidence — Registro de fotos</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #f3f5f9;
+      color: #172033;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    header {
+      background: #111827;
+      color: white;
+      padding: 26px 20px;
+    }
+    .container { width: 100%; max-width: 920px; margin: auto; }
+    h1 { margin: 0; font-size: 28px; }
+    header p { margin: 8px 0 0; color: #cbd5e1; }
+    main { padding: 20px; }
+    .card {
+      background: white;
+      border: 1px solid #e0e5ed;
+      border-radius: 18px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 16px #17203308;
+    }
+    h2 { font-size: 20px; margin: 0 0 16px; }
+    .notice {
+      padding: 14px;
+      background: #fff7dc;
+      color: #714e06;
+      border-radius: 12px;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+    .preview {
+      position: relative;
+      background: #101827;
+      border-radius: 14px;
+      overflow: hidden;
+      aspect-ratio: 4 / 3;
+      max-height: 480px;
+      display: grid;
+      place-items: center;
+    }
+    video { width: 100%; height: 100%; object-fit: contain; }
+    video[hidden] { display: none; }
+    .placeholder {
+      color: #cbd5e1;
+      padding: 24px;
+      text-align: center;
+      line-height: 1.6;
+    }
+    label { display: block; margin: 18px 0 8px; font-weight: 600; }
+    textarea {
+      width: 100%;
+      min-height: 90px;
+      padding: 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      font: inherit;
+      resize: vertical;
+    }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+    button, .download {
+      border: none;
+      border-radius: 10px;
+      padding: 12px 16px;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      background: #2563eb;
+      color: white;
+      text-decoration: none;
+      text-align: center;
+    }
+    button.secondary { background: #e8edf4; color: #172033; }
+    button.danger { background: #fee2e2; color: #991b1b; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    button:focus-visible, a:focus-visible, textarea:focus-visible {
+      outline: 3px solid #60a5fa;
+      outline-offset: 3px;
+    }
+    #status { margin: 16px 0 0; line-height: 1.5; }
+    .muted { color: #657087; font-size: 14px; line-height: 1.5; }
+    .gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .photo { border: 1px solid #e0e5ed; border-radius: 12px; overflow: hidden; }
+    .photo img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: contain; background: #111827; }
+    .photo-body { padding: 14px; }
+    .photo-body p { overflow-wrap: anywhere; white-space: pre-wrap; }
+    .photo .actions > * { flex: 1; }
+    footer { padding: 0 20px 28px; text-align: center; }
+    @media (max-width: 600px) {
+      main { padding: 14px; }
+      .card { padding: 16px; }
+      .gallery { grid-template-columns: 1fr; }
+      .actions > button { flex: 1 1 140px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>Evidence</h1>
+      <p>Registro de fotos com descrição</p>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="notice">
+      <strong>Importante:</strong> as fotos não são enviadas para um servidor.
+      Baixe as imagens antes de fechar ou atualizar esta página.
+      A descrição permanece apenas nesta página e não é incluída no arquivo da foto.
+    </div>
+
+    <section class="card">
+      <h2>Câmera</h2>
+
+      <div class="preview">
+        <video id="video" autoplay playsinline muted hidden></video>
+        <div id="placeholder" class="placeholder">
+          Clique em “Abrir câmera” e permita o acesso no navegador.
+        </div>
+      </div>
+
+      <label for="description">Descrição do registro</label>
+      <textarea
+        id="description"
+        maxlength="2000"
+        placeholder="Ex.: vistoria da entrada, ocorrência na sala..."
+      ></textarea>
+
+      <div class="actions">
+        <button id="start" type="button">Abrir câmera</button>
+        <button id="capture" type="button" disabled>Tirar foto</button>
+        <button id="stop" class="secondary" type="button" disabled>Fechar câmera</button>
+      </div>
+
+      <p id="status" role="status" aria-live="polite">Câmera desligada.</p>
+      <p class="muted">
+        O acesso à câmera exige HTTPS ou localhost.
+        O GitHub Pages publica seu site com HTTPS.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>Fotos desta sessão <span id="count">(0)</span></h2>
+      <p id="empty" class="muted">Nenhuma foto registrada ainda.</p>
+      <div id="gallery" class="gallery"></div>
+    </section>
+  </main>
+
+  <footer class="muted">
+    Evidence · Versão básica · Sem armazenamento em nuvem
+  </footer>
+
+  <script>
+    const video = document.getElementById("video");
+    const placeholder = document.getElementById("placeholder");
+    const startButton = document.getElementById("start");
+    const captureButton = document.getElementById("capture");
+    const stopButton = document.getElementById("stop");
+    const status = document.getElementById("status");
+    const description = document.getElementById("description");
+    const gallery = document.getElementById("gallery");
+    const count = document.getElementById("count");
+    const empty = document.getElementById("empty");
+
+    let stream = null;
+    let opening = false;
+    let capturing = false;
+    let sequence = 0;
+    const photoUrls = new Set();
+
+    function refreshButtons() {
+      startButton.disabled = opening || Boolean(stream);
+      captureButton.disabled = !stream || capturing;
+      stopButton.disabled = !stream;
+    }
+
+    function updateCount() {
+      count.textContent = "(" + gallery.children.length + ")";
+      empty.hidden = gallery.children.length > 0;
+    }
+
+    function stopCamera() {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+      }
+      video.srcObject = null;
+      video.hidden = true;
+      placeholder.hidden = false;
+      refreshButtons();
+    }
+
+    startButton.addEventListener("click", async () => {
+      if (!window.isSecureContext) {
+        status.textContent =
+          "Abra o site pelo endereço HTTPS do GitHub Pages para usar a câmera.";
+        return;
+      }
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        status.textContent =
+          "Este navegador não oferece acesso à câmera. Tente um navegador atualizado.";
+        return;
+      }
+
+      opening = true;
+      refreshButtons();
+      status.textContent = "Solicitando acesso à câmera...";
+
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          },
+          audio: false
+        });
+
+        video.srcObject = stream;
+        video.hidden = false;
+        placeholder.hidden = true;
+        await video.play();
+        status.textContent = "Câmera pronta. Você já pode tirar uma foto.";
+      } catch (error) {
+        stopCamera();
+
+        if (error.name === "NotAllowedError") {
+          status.textContent =
+            "Acesso à câmera não permitido. Verifique as permissões do navegador.";
+        } else if (error.name === "NotFoundError") {
+          status.textContent = "Nenhuma câmera foi encontrada neste dispositivo.";
+        } else if (error.name === "NotReadableError") {
+          status.textContent =
+            "Não foi possível abrir a câmera. Ela pode estar sendo usada por outro aplicativo.";
+        } else {
+          status.textContent = "Não foi possível iniciar a câmera. Tente novamente.";
+        }
+      } finally {
+        opening = false;
+        refreshButtons();
+      }
+    });
+
+    stopButton.addEventListener("click", () => {
+      stopCamera();
+      status.textContent = "Câmera desligada. As fotos continuam disponíveis abaixo.";
+    });
+
+    captureButton.addEventListener("click", () => {
+      if (!stream || !video.videoWidth || !video.videoHeight) {
+        status.textContent = "Aguarde a imagem da câmera e tente novamente.";
+        return;
+      }
+
+      capturing = true;
+      refreshButtons();
+
+      const capturedDescription = description.value.trim();
+      const capturedAt = new Date();
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const context = canvas.getContext("2d");
+
+      if (!context) {
+        capturing = false;
+        refreshButtons();
+        status.textContent = "Não foi possível preparar a foto.";
+        return;
+      }
+
+      context.drawImage(video, 0, 0);
+
+      canvas.toBlob(blob => {
+        capturing = false;
+        refreshButtons();
+
+        if (!blob) {
+          status.textContent = "Não foi possível gerar a foto. Tente novamente.";
+          return;
+        }
+
+        sequence += 1;
+        const url = URL.createObjectURL(blob);
+        photoUrls.add(url);
+
+        const timestamp = capturedAt.toISOString().replace(/[:.]/g, "-");
+        const filename = "evidence-" + timestamp + "-" + sequence + ".jpg";
+
+        const article = document.createElement("article");
+        article.className = "photo";
+
+        const image = document.createElement("img");
+        image.src = url;
+        image.alt = capturedDescription || "Foto registrada no Evidence";
+
+        const body = document.createElement("div");
+        body.className = "photo-body";
+
+        const dateText = document.createElement("p");
+        dateText.className = "muted";
+        dateText.textContent = capturedAt.toLocaleString("pt-BR");
+
+        const note = document.createElement("p");
+        note.textContent = capturedDescription || "Sem descrição.";
+
+        const actions = document.createElement("div");
+        actions.className = "actions";
+
+        const download = document.createElement("a");
+        download.className = "download";
+        download.href = url;
+        download.download = filename;
+        download.textContent = "Baixar foto";
+
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "danger";
+        remove.textContent = "Excluir";
+        remove.addEventListener("click", () => {
+          article.remove();
+          URL.revokeObjectURL(url);
+          photoUrls.delete(url);
+          updateCount();
+          status.textContent = "Foto removida desta sessão.";
+        });
+
+        actions.append(download, remove);
+        body.append(dateText, note, actions);
+        article.append(image, body);
+        gallery.prepend(article);
+
+        updateCount();
+        status.textContent =
+          "Foto registrada! Clique em “Baixar foto” para guardar no seu dispositivo.";
+      }, "image/jpeg", 0.92);
+    });
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden && stream) {
+        stopCamera();
+        status.textContent =
+          "Câmera desligada ao sair da página. Clique em “Abrir câmera” para continuar.";
+      }
+    });
+
+    window.addEventListener("beforeunload", event => {
+      if (photoUrls.size > 0) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    });
+
+    window.addEventListener("pagehide", () => {
+      stopCamera();
+    });
+  </script>
+</body>
+</html>
